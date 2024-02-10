@@ -88,7 +88,7 @@ class _FlutterWebAuth2ServerPlugin extends FlutterWebAuth2Platform {
 
     await _server!.listen((req) async {
       req.response.headers.add('Content-Type', 'text/html');
-      req.response.write(parsedOptions.landingPageHtml);
+      // req.response.write(parsedOptions.landingPageHtml);
       await req.response.close();
 
       result = req.requestedUri.toString();
