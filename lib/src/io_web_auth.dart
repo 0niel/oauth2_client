@@ -1,6 +1,8 @@
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
-
 import 'base_web_auth.dart';
+import 'package:flutter_web_auth_2/src/server.dart';
+import 'package:flutter_web_auth_2/src/webview.dart';
+import 'package:flutter_web_auth_2_platform_interface/flutter_web_auth_2_platform_interface.dart';
 
 BaseWebAuth createWebAuth() => IoWebAuth();
 
@@ -39,20 +41,29 @@ const _defaultLandingPage = '''
 ''';
 
 class IoWebAuth implements BaseWebAuth {
+  final FlutterWebAuth2Platform _webviewImpl = FlutterWebAuth2WebViewPlugin();
+  final FlutterWebAuth2Platform _serverImpl = FlutterWebAuth2ServerPlugin();
+
   @override
-  Future<String> authenticate(
-      {required String callbackUrlScheme,
-      required String url,
-      required String redirectUrl,
-      Map<String, dynamic>? opts}) async {
-    return await FlutterWebAuth2.authenticate(
-      callbackUrlScheme: callbackUrlScheme,
-      url: url,
-      options: FlutterWebAuth2Options(
-        preferEphemeral: (opts?['preferEphemeral'] == true),
-        landingPageHtml: _defaultLandingPage,
-        useWebview: false,
-      ),
-    );
+  Future<String> authenticate({
+    required String callbackUrlScheme,
+    required String redirectUrl,
+    required String url,
+    Map<String, dynamic>? opts,
+  }) async {
+    final options = opts ?? <String, dynamic>{};
+    final parsedOptions = FlutterWebAuth2Options.fromJson(options);
+    if (parsedOptions.useWebview) {
+      return _webviewImpl.authenticate(
+        url: url,
+        callbackUrlScheme: callbackUrlScheme,
+        options: options,
+      );
+    }
+    return _serverImpl
+        .authenticate(url: url, callbackUrlScheme: callbackUrlScheme, options: {
+      'preferEphemeral': (opts?['preferEphemeral'] == true),
+      'landingPageHtml': _defaultLandingPage,
+    });
   }
 }
