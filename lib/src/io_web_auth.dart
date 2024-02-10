@@ -51,6 +51,7 @@ class IoWebAuth implements BaseWebAuth {
       options: FlutterWebAuth2Options(
         preferEphemeral: (opts?['preferEphemeral'] == true),
         landingPageHtml: _defaultLandingPage,
+        useWebview: false,
       ),
     );
   }
