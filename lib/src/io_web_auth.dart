@@ -1,8 +1,14 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'base_web_auth.dart';
 import 'package:flutter_web_auth_2/src/server.dart';
 import 'package:flutter_web_auth_2/src/webview.dart';
 import 'package:flutter_web_auth_2_platform_interface/flutter_web_auth_2_platform_interface.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:window_to_front/window_to_front.dart';
 
 BaseWebAuth createWebAuth() => IoWebAuth();
 
@@ -40,9 +46,75 @@ const _defaultLandingPage = '''
 </html>
 ''';
 
+class _FlutterWebAuth2ServerPlugin extends FlutterWebAuth2Platform {
+  HttpServer? _server;
+  Timer? _authTimeout;
+
+  /// Registers the internal server implementation.
+  static void registerWith() {
+    FlutterWebAuth2Platform.instance = FlutterWebAuth2ServerPlugin();
+  }
+
+  @override
+  Future<String> authenticate({
+    required String url,
+    required String callbackUrlScheme,
+    required Map<String, dynamic> options,
+  }) async {
+    final parsedOptions = FlutterWebAuth2Options.fromJson(options);
+
+    // Validate callback url
+    final callbackUri = Uri.parse(callbackUrlScheme);
+
+    if (callbackUri.scheme != 'http' ||
+        (callbackUri.host != 'localhost' && callbackUri.host != '127.0.0.1') ||
+        !callbackUri.hasPort) {
+      throw ArgumentError(
+        'Callback url scheme must start with http://localhost:{port}',
+      );
+    }
+
+    await _server?.close(force: true);
+
+    _server = await HttpServer.bind('localhost', callbackUri.port);
+    String? result;
+
+    _authTimeout?.cancel();
+    _authTimeout = Timer(Duration(seconds: parsedOptions.timeout), () {
+      _server?.close();
+    });
+
+    await launchUrl(Uri.parse(url));
+
+    await _server!.listen((req) async {
+      req.response.headers.add('Content-Type', 'text/html');
+      // req.response.write(parsedOptions.landingPageHtml);
+      await req.response.close();
+
+      result = req.requestedUri.toString();
+      await _server?.close();
+      _server = null;
+    }).asFuture();
+
+    await _server?.close(force: true);
+    _authTimeout?.cancel();
+
+    if (result != null) {
+      await WindowToFront.activate();
+      return result!;
+    }
+    throw PlatformException(message: 'User canceled login', code: 'CANCELED');
+  }
+
+  @override
+  Future clearAllDanglingCalls() async {
+    await _server?.close(force: true);
+  }
+}
+
 class IoWebAuth implements BaseWebAuth {
   final FlutterWebAuth2Platform _webviewImpl = FlutterWebAuth2WebViewPlugin();
-  final FlutterWebAuth2Platform _serverImpl = FlutterWebAuth2ServerPlugin();
+  final FlutterWebAuth2Platform _serverImpl = _FlutterWebAuth2ServerPlugin();
 
   @override
   Future<String> authenticate({
