@@ -46,7 +46,7 @@ const _defaultLandingPage = '''
 </html>
 ''';
 
-class _FlutterWebAuth2ServerPlugin extends FlutterWebAuth2Platform {
+class _FlutterWebAuth2WithServerPlugin extends FlutterWebAuth2Platform {
   HttpServer? _server;
   Timer? _authTimeout;
 
@@ -69,9 +69,10 @@ class _FlutterWebAuth2ServerPlugin extends FlutterWebAuth2Platform {
     if (callbackUri.scheme != 'http' ||
         (callbackUri.host != 'localhost' && callbackUri.host != '127.0.0.1') ||
         !callbackUri.hasPort) {
-      throw ArgumentError(
-        'Callback url scheme must start with http://localhost:{port}',
-      );
+      return await FlutterWebAuth2.authenticate(
+          url: url,
+          callbackUrlScheme: callbackUrlScheme,
+          options: parsedOptions);
     }
 
     await _server?.close(force: true);
@@ -114,7 +115,8 @@ class _FlutterWebAuth2ServerPlugin extends FlutterWebAuth2Platform {
 
 class IoWebAuth implements BaseWebAuth {
   final FlutterWebAuth2Platform _webviewImpl = FlutterWebAuth2WebViewPlugin();
-  final FlutterWebAuth2Platform _serverImpl = _FlutterWebAuth2ServerPlugin();
+  final FlutterWebAuth2Platform _serverImpl =
+      _FlutterWebAuth2WithServerPlugin();
 
   @override
   Future<String> authenticate({
